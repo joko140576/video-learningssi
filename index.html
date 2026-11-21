@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Learning Center</title>
+<style>
+  :root {
+    --bg: #f3f5f4;
+    --surface: #ffffff;
+    --text: #17211d;
+    --muted: #5d6b65;
+    --line: #d8dfdb;
+    --accent: #0f6b57;
+    --accent-soft: #e0f1ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101614;
+      --surface: #18211e;
+      --text: #e8efec;
+      --muted: #9aaba4;
+      --line: #2b3834;
+      --accent: #3fb59b;
+      --accent-soft: #1b2e29;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .layout {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 28px;
+  }
+  .video-wrap {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .video-wrap iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  h1 { font-size: 1.5rem; margin: 18px 0 12px; }
+  h2 { font-size: 1.05rem; margin: 0 0 12px; }
+  #progress { font-weight: 400; color: var(--muted); font-size: 0.9rem; }
+  .bar {
+    height: 6px;
+    background: var(--line);
+    border-radius: 3px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .bar i {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--accent);
+    transition: width 0.3s;
+  }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  .btn {
+    padding: 10px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+  .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .item {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+    text-align: left;
+    padding: 8px;
+    margin-bottom: 8px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+  .item.active { border-color: var(--accent); background: var(--accent-soft); }
+  .item img { width: 96px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 5px; background: var(--line); }
+  .item span { font-size: 0.92rem; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; padding: 12px; }
+  }
+</style>
+</head>
+<body>
+  <main class="layout">
+    <section>
+      <div class="video-wrap">
+        <iframe id="player" title="Video pembelajaran"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allow="accelerometer; autoplay; encrypted-media; picture-in-picture; web-share"
+          allowfullscreen></iframe>
+      </div>
+      <h1 id="video-title"></h1>
+      <div class="actions">
+        <button class="btn" id="prev">Sebelumnya</button>
+        <button class="btn primary" id="done">Selesai dan lanjut</button>
+      </div>
+    </section>
+
+    <aside>
+      <h2>Daftar materi <span id="progress"></span></h2>
+      <div class="bar"><i id="bar"></i></div>
+      <div id="playlist"></div>
+    </aside>
+  </main>
+
+<script>
+  // Daftar video. start = detik mulai (dari &t=...s di link YouTube)
+  const videos = [
+    { id: "eb8y66R69rM", title: "Materi 1", start: 73 },
+    { id: "d6ykQ6qce-c", title: "Materi 2", start: 0 },
+    { id: "Y2wpAb6LWds", title: "Materi 3", start: 93 },
+  ];
+
+  const player = document.getElementById("player");
+  const titleEl = document.getElementById("video-title");
+  const playlistEl = document.getElementById("playlist");
+  const progressEl = document.getElementById("progress");
+  const barEl = document.getElementById("bar");
+  const prevBtn = document.getElementById("prev");
+
+  let index = 0;
+  let done = [];
+
+  try {
+    done = JSON.parse(localStorage.getItem("done") || "[]");
+    index = Number(localStorage.getItem("index") || 0);
+    if (!(index >= 0 && index < videos.length)) index = 0;
+  } catch (e) {}
+
+  function save() {
+    try {
+      localStorage.setItem("done", JSON.stringify(done));
+      localStorage.setItem("index", index);
+    } catch (e) {}
+  }
+
+  function play(i) {
+    index = i;
+    const v = videos[i];
+    let src = "https://www.youtube.com/embed/" + v.id +
+      "?start=" + v.start + "&rel=0&playsinline=1";
+    if (location.protocol.startsWith("http")) {
+      src += "&origin=" + encodeURIComponent(location.origin);
+    }
+    player.src = src;
+    titleEl.textContent = v.title;
+    prevBtn.disabled = i === 0;
+    save();
+    renderPlaylist();
+  }
+
+  function renderPlaylist() {
+    progressEl.textContent = "(" + done.length + "/" + videos.length + " selesai)";
+    barEl.style.width = (done.length / videos.length * 100) + "%";
+    playlistEl.innerHTML = "";
+    videos.forEach(function (v, i) {
+      const btn = document.createElement("button");
+      btn.className = "item" + (i === index ? " active" : "");
+      const img = document.createElement("img");
+      img.src = "https://img.youtube.com/vi/" + v.id + "/mqdefault.jpg";
+      img.alt = "";
+      const label = document.createElement("span");
+      label.textContent = (done.includes(v.id) ? "✓ " : "") + v.title;
+      btn.append(img, label);
+      btn.addEventListener("click", function () { play(i); });
+      playlistEl.appendChild(btn);
+    });
+  }
+
+  document.getElementById("done").addEventListener("click", function () {
+    const id = videos[index].id;
+    if (!done.includes(id)) done.push(id);
+    if (index < videos.length - 1) {
+      play(index + 1);
+    } else {
+      save();
+      renderPlaylist();
+      alert("Semua materi sudah selesai.");
+    }
+  });
+
+  prevBtn.addEventListener("click", function () {
+    if (index > 0) play(index - 1);
+  });
+
+  play(index);
+</script>
+</body>
+</html>
